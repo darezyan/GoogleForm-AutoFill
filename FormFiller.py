@@ -260,3 +260,16 @@ def build_payload(form, overrides, email=None):
     if form["fbzx"]:
         payload["fbzx"] = form["fbzx"]
     return payload
+
+
+def submit(session, form, payload):
+    """Sends one response. Returns (ok, message)."""
+    resp = session.post(form["submit_url"], data=payload, timeout=30)
+    if resp.status_code == 200:
+        return True, "Submitted."
+    if resp.status_code == 401 or "accounts.google.com" in resp.url:
+        return False, "Rejected: the form now needs a Google sign-in."
+    if resp.status_code == 429:
+        return False, "Rejected: Google says too many requests. Increase the wait between submissions."
+    return False, (f"Rejected (HTTP {resp.status_code}). An answer may not match the form's rules; "
+                   "set it as a fixed answer.")
