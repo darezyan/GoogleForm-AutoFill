@@ -273,3 +273,59 @@ def submit(session, form, payload):
         return False, "Rejected: Google says too many requests. Increase the wait between submissions."
     return False, (f"Rejected (HTTP {resp.status_code}). An answer may not match the form's rules; "
                    "set it as a fixed answer.")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Fill a Google Form a number of times.")
+    parser.add_argument("link", nargs="?", help="Google Form link")
+    parser.add_argument("count", nargs="?", type=int, help="How many times to submit")
+    parser.add_argument("--answers", help="JSON file of fixed answers: {\"Question title\": \"answer\" or [choices]}")
+    parser.add_argument("--email", help="Email to send if the form collects email addresses (otherwise a test address is used)")
+    parser.add_argument("--delay", type=float, default=2, help="Seconds to wait after each submission (default 2)")
+    parser.add_argument("--dry-run", action="store_true", help="Show what would be sent without submitting")
+    args = parser.parse_args()
+
+    link = args.link or input("Form link: ").strip()
+    count = args.count or int(input("How many times to fill it: ").strip())
+    delay = max(args.delay, 0)
+
+    overrides = {}
+    if args.answers:
+        with open(args.answers, encoding="utf-8") as f:
+            overrides = json.load(f)
+        if not isinstance(overrides, dict):
+            sys.exit("The answers file must be a JSON object like {\"Question title\": \"answer\"}.")
+
+    try:
+        form = load_form(link)
+    except FormError as e:
+        sys.exit(str(e))
+
+    print(f"Found {len(form['questions'])} question(s) on {form['pages']} page(s):")
+    for q in form["questions"]:
+        print(f"  {'*' if q['required'] else ' '} {q['title']}")
+    missing = unanswerable(form, overrides)
+    if missing:
+        sys.exit("These required questions need a fixed answer (use --answers): " + ", ".join(missing))
+
+    if args.dry_run:
+        print(json.dumps(build_payload(form, overrides, args.email), indent=2, default=str))
+        return
+
+    session = requests.Session()
+    ok = 0
+    for i in range(1, count + 1):
+        try:
+            success, message = submit(session, form, build_payload(form, overrides, args.email))
+            ok += success
+        except requests.RequestException as e:
+            message = f"Error: {e}"
+        print(f"[{i}/{count}] {message}")
+        if i < count:
+            time.sleep(delay)
+
+    print(f"Done: {ok}/{count} submitted.")
+
+
+if __name__ == "__main__":
+    main()
