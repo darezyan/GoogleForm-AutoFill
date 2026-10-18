@@ -67,3 +67,80 @@ def run(link, count, delay, overrides, email):
         log(f"Unexpected error, stopped: {type(e).__name__}: {e}")
     finally:
         state["running"] = False
+
+
+class Handler(BaseHTTPRequestHandler):
+    def send_json(self, data, status=200):
+        body = json.dumps(data).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self):
+        if self.path == "/":
+            body = PAGE.encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        elif self.path == "/api/status":
+            with lock:
+                self.send_json({k: state[k] for k in ("running", "ok", "done", "total", "log")})
+        else:
+            self.send_error(404)
+
+    def do_POST(self):
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+            data = json.loads(self.rfile.read(length) or b"{}")
+        except ValueError:
+            return self.send_json({"error": "Bad request."}, 400)
+
+        if self.path == "/api/load":
+            form, error = read_form(data.get("link", ""))
+            if error:
+                return self.send_json({"error": error}, 400)
+            return self.send_json({
+                "pages": form["pages"],
+                "questions": form["questions"],
+                "collects_email": form["collects_email"],
+                "missing": unanswerable(form, {}),
+            })
+
+        if self.path == "/api/start":
+            if state["running"]:
+                return self.send_json({"error": "Already running."}, 409)
+            try:
+                count = int(data.get("count") or 0)
+                delay = max(float(data.get("delay") or 0), 0)
+            except ValueError:
+                return self.send_json({"error": "How many times and the wait must be numbers."}, 400)
+            try:
+                overrides = json.loads(data.get("answers") or "{}")
+            except ValueError as e:
+                return self.send_json({"error": f"Fixed answers aren't valid JSON: {e}"}, 400)
+            if not isinstance(overrides, dict):
+                return self.send_json({"error": 'Fixed answers must look like {"Question title": "answer"}.'}, 400)
+            if count < 1:
+                return self.send_json({"error": "How many times must be at least 1."}, 400)
+            if not data.get("link", "").strip():
+                return self.send_json({"error": "Paste the form link first."}, 400)
+            state.update(running=True, ok=0, done=0, total=count, log=[], stop=False)
+            threading.Thread(
+                target=run,
+                args=(data["link"], count, delay, overrides, data.get("email") or None),
+                daemon=True,
+            ).start()
+            return self.send_json({"started": True})
+
+        if self.path == "/api/stop":
+            state["stop"] = True
+            return self.send_json({"stopping": True})
+
+        self.send_error(404)
+
+    def log_message(self, *args):
+        pass  # keep the terminal quiet
