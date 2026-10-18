@@ -194,3 +194,31 @@ def checkbox_pick(options, rule):
             elif sub == 201: high = max(min(n, len(options)), 1)  # at most
             elif sub == 204: low = high = min(max(n, 1), len(options))  # exactly
     return random.sample(options, random.randint(low, max(low, high)))
+
+
+def make_answer(question, overrides):
+    """Returns the answer for one question. Fixed answers win;
+    a list there means one of its values is picked at random each time."""
+
+    if question["title"] in overrides:
+        value = overrides[question["title"]]
+        return random.choice(value) if isinstance(value, list) and value else value
+
+    qtype, options = question["type"], question["options"]
+    if qtype == CHECKBOXES:
+        return checkbox_pick(options, question["rule"]) if options else None
+    if qtype in TEXT_TYPES:
+        return text_for_rule(question["rule"])
+    if qtype == DATE:
+        return datetime.datetime.now()
+    if qtype == TIME:
+        return datetime.datetime.now().time()
+    if options:  # multiple choice, dropdown, scale, grid, and any newer choice type
+        return random.choice(options)
+    return None
+
+
+def unanswerable(form, overrides):
+    """Required questions the script can't answer by itself."""
+    return [q["title"] for q in form["questions"]
+            if q["required"] and q["title"] not in overrides and make_answer(q, overrides) is None]
