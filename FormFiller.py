@@ -1,0 +1,119 @@
+# Fill any Google Form a given number of times
+
+import argparse
+import datetime
+import json
+import math
+import random
+import re
+import string
+import sys
+import time
+
+import requests
+
+# Question type codes used in the form's FB_PUBLIC_LOAD_DATA_
+SHORT_ANSWER = 0
+PARAGRAPH = 1
+MULTIPLE_CHOICE = 2
+DROPDOWN = 3
+CHECKBOXES = 4
+LINEAR_SCALE = 5
+GRID = 7
+PAGE_BREAK = 8
+DATE = 9
+TIME = 10
+FILE_UPLOAD = 13
+
+TEXT_TYPES = (SHORT_ANSWER, PARAGRAPH)
+
+# Form setting: data[1][10][6] says whether the form collects email addresses
+COLLECT_EMAILS_VERIFIED = 2
+COLLECT_EMAILS_INPUT = 3
+
+# Answer-rule ("response validation") codes: [type, subtype, args]
+RULE_NUMBER, RULE_TEXT, RULE_REGEX, RULE_LENGTH, RULE_CHECKBOX = 1, 2, 4, 6, 7
+
+
+class FormError(Exception):
+    """A problem with the form itself (closed, needs sign-in, not a form link)."""
+
+
+def normalize_link(link):
+    link = link.strip()
+    if link and not link.startswith(("http://", "https://")):
+        link = "https://" + link
+    return link
+
+
+def hidden_input(html, name):
+    match = re.search(r'<input[^>]*name="%s"[^>]*value="([^"]*)"' % re.escape(name), html)
+    if not match:
+        return None
+    return match.group(1).replace("&quot;", '"').replace("&amp;", "&")
+
+
+def load_form(link):
+    """Fetches the form page and returns a dict describing the form:
+    submit_url, questions, pages, fbzx, draft, collects_email."""
+
+    resp = requests.get(normalize_link(link), timeout=30)  # also follows forms.gle short links
+    if "accounts.google.com" in resp.url:
+        raise FormError("This form needs a Google sign-in, so it can't be filled by this script.")
+    if resp.url.endswith("closedform"):
+        raise FormError("This form is closed and no longer accepts responses.")
+    if resp.status_code in (404, 410):
+        raise FormError("Form not found. Check the link.")
+    resp.raise_for_status()
+
+    match = re.search(r"FB_PUBLIC_LOAD_DATA_\s*=\s*(\[.+?\])\s*;\s*</script>", resp.text, re.S)
+    if not match:
+        raise FormError("Couldn't read the form. Use the form's share link (ending in /viewform, or a forms.gle link), not the edit link.")
+    data = json.loads(match.group(1))
+
+    # .../forms/d/e/<id>/viewform?... -> .../forms/d/e/<id>/formResponse
+    submit_url = resp.url.split("?")[0].rsplit("/", 1)[0] + "/formResponse"
+
+    settings = data[1][10] if len(data[1]) > 10 and data[1][10] else []
+    collects_email = settings[6] if len(settings) > 6 else None
+    if collects_email == COLLECT_EMAILS_VERIFIED:
+        raise FormError("This form records verified emails, which needs a Google sign-in, so it can't be filled by this script.")
+
+    questions = []
+    pages = 1
+    for item in data[1][1] or []:
+        title, qtype = item[1], item[3]
+        if qtype == PAGE_BREAK:
+            pages += 1
+            continue
+        if qtype == FILE_UPLOAD:
+            raise FormError("This form has a file upload question, which needs a Google sign-in.")
+        if len(item) < 5 or not item[4]:
+            continue  # section headers, images, videos
+
+        for entry in item[4]:
+            options = [o[0] for o in (entry[1] or []) if o and o[0]]
+            name = title or ""
+            if qtype == GRID and len(entry) > 3 and entry[3]:
+                name = f"{name} [{entry[3][0]}]"
+            rule = entry[4][0] if len(entry) > 4 and entry[4] and qtype in TEXT_TYPES + (CHECKBOXES,) else None
+            flags = entry[7] if len(entry) > 7 and entry[7] else []
+            questions.append({
+                "id": entry[0],
+                "title": name,
+                "type": qtype,
+                "options": options,
+                "required": len(entry) > 2 and bool(entry[2]),
+                "rule": rule,
+                "has_time": bool(flags[0]) if qtype == DATE and len(flags) > 0 else False,
+                "has_year": bool(flags[1]) if qtype == DATE and len(flags) > 1 else True,
+            })
+
+    return {
+        "submit_url": submit_url,
+        "questions": questions,
+        "pages": pages,
+        "fbzx": hidden_input(resp.text, "fbzx"),
+        "draft": hidden_input(resp.text, "partialResponse"),
+        "collects_email": collects_email == COLLECT_EMAILS_INPUT,
+    }
