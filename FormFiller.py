@@ -117,3 +117,65 @@ def load_form(link):
         "draft": hidden_input(resp.text, "partialResponse"),
         "collects_email": collects_email == COLLECT_EMAILS_INPUT,
     }
+
+
+def random_text():
+    return "Sample " + "".join(random.choices(string.ascii_lowercase, k=6))
+
+
+def random_email():
+    return "test." + "".join(random.choices(string.ascii_lowercase + string.digits, k=8)) + "@example.com"
+
+
+def rule_args(rule):
+    args = rule[2] if len(rule) > 2 and isinstance(rule[2], list) else []
+    return args
+
+
+def text_for_rule(rule):
+    """Makes up text that passes a text question's answer rule.
+    Returns None for rules that can't be satisfied automatically (custom patterns)."""
+
+    if not rule:
+        return random_text()
+    rtype, sub = rule[0], rule[1] if len(rule) > 1 else None
+    args = rule_args(rule)
+
+    if rtype == RULE_NUMBER:
+        nums = []
+        for a in args:
+            try:
+                nums.append(float(a))
+            except (TypeError, ValueError):
+                pass
+        n = nums[0] if nums else 0
+        if sub == 1:   value = n + 1                 # greater than
+        elif sub == 2: value = n                     # greater or equal
+        elif sub == 3: value = n - 1                 # less than
+        elif sub == 4: value = n                     # less or equal
+        elif sub == 5: value = n                     # equal to
+        elif sub == 6: value = n + 1                 # not equal to
+        elif sub == 7 and len(nums) > 1:             # between
+            low, high = math.ceil(nums[0]), math.floor(nums[1])
+            value = random.randint(low, high) if low <= high else nums[0]
+        elif sub == 8 and len(nums) > 1: value = nums[1] + 1  # not between
+        else:          value = random.randint(1, 100)  # any number / whole number
+        return str(int(value)) if float(value).is_integer() else str(value)
+
+    if rtype == RULE_TEXT:
+        if sub == 100 and args:   return f"Sample {args[0]}"   # must contain
+        if sub == 101:            return "Sample answer"       # must not contain
+        if sub == 102:            return random_email()
+        if sub == 103:            return "https://example.com"
+        return random_text()
+
+    if rtype == RULE_LENGTH:
+        try:
+            limit = int(args[0])
+        except (IndexError, TypeError, ValueError):
+            return random_text()
+        if sub == 202: return random_text()[:max(limit, 1)]           # max length
+        if sub == 203: return " ".join(random_text() for _ in range(limit // 13 + 2))  # min length
+        return random_text()
+
+    return None  # custom pattern (regex): needs a fixed answer
