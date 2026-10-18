@@ -222,3 +222,41 @@ def unanswerable(form, overrides):
     """Required questions the script can't answer by itself."""
     return [q["title"] for q in form["questions"]
             if q["required"] and q["title"] not in overrides and make_answer(q, overrides) is None]
+
+
+def build_payload(form, overrides, email=None):
+    payload = {}
+    for q in form["questions"]:
+        key = f"entry.{q['id']}"
+        answer = make_answer(q, overrides)
+        if answer is None:
+            continue
+        if q["type"] == DATE and isinstance(answer, datetime.datetime):
+            if q["has_year"]:
+                payload[key + "_year"] = answer.year
+            payload[key + "_month"] = answer.month
+            payload[key + "_day"] = answer.day
+            if q["has_time"]:
+                payload[key + "_hour"] = f"{answer.hour:02d}"
+                payload[key + "_minute"] = f"{answer.minute:02d}"
+        elif q["type"] == TIME and isinstance(answer, datetime.time):
+            payload[key + "_hour"] = f"{answer.hour:02d}"
+            payload[key + "_minute"] = f"{answer.minute:02d}"
+        else:
+            payload[key] = answer  # a list is sent as repeated keys (checkboxes)
+
+    try:
+        draft = json.loads(form["draft"]) if form["draft"] else [None, None, form["fbzx"]]
+    except ValueError:
+        draft = [None, None, form["fbzx"]]
+    if form["collects_email"]:
+        email = email or random_email()
+        payload["emailAddress"] = email
+        draft += [None] * max(0, 8 - len(draft))
+        draft[6], draft[7] = email, 1
+
+    payload["pageHistory"] = ",".join(str(i) for i in range(form["pages"]))
+    payload["partialResponse"] = json.dumps(draft)
+    if form["fbzx"]:
+        payload["fbzx"] = form["fbzx"]
+    return payload
