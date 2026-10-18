@@ -179,3 +179,18 @@ def text_for_rule(rule):
         return random_text()
 
     return None  # custom pattern (regex): needs a fixed answer
+
+
+def checkbox_pick(options, rule):
+    low, high = 1, len(options)
+    if rule and rule[0] == RULE_CHECKBOX:
+        try:
+            n = int(rule_args(rule)[0])
+        except (IndexError, TypeError, ValueError):
+            n = None
+        if n is not None:
+            sub = rule[1]
+            if sub == 200: low = min(max(n, 1), len(options))   # at least
+            elif sub == 201: high = max(min(n, len(options)), 1)  # at most
+            elif sub == 204: low = high = min(max(n, 1), len(options))  # exactly
+    return random.sample(options, random.randint(low, max(low, high)))
