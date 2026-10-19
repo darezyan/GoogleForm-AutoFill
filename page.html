@@ -4,132 +4,377 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Form Filler</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
 <style>
-  :root { --bg:#f6f7f9; --card:#fff; --text:#1d2330; --muted:#667085; --line:#d9dde5; --accent:#5b4fe0; --ok:#1a7f4b; --bad:#c0392b; }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg:#14161b; --card:#1d2027; --text:#e7e9ee; --muted:#9aa1ae; --line:#2e323c; --accent:#8b80ff; --ok:#4cc38a; --bad:#ff7a6b; }
+  :root {
+    --bg: #0e1016; --panel: #171a22; --panel-2: #1e222c; --line: #2a2f3b;
+    --text: #e4ded7; --muted: #9a9ba3; --faint: #6b6e78;
+    --accent: #a78bfa; --accent-ink: #14111f; --accent-soft: rgb(167 139 250 / 0.14);
+    --ok: #4ade80; --ok-soft: rgb(74 222 128 / 0.12);
+    --bad: #f87171; --bad-soft: rgb(248 113 113 / 0.12);
+    --warn: #fbbf24;
+    --radius: 16px;
   }
-  * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 system-ui, sans-serif; }
-  main { max-width:720px; margin:32px auto; padding:0 16px; }
-  h1 { font-size:22px; margin:0 0 4px; }
-  p.sub { color:var(--muted); margin:0 0 20px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:18px; margin-bottom:16px; }
-  label { display:block; font-weight:600; margin:12px 0 4px; }
-  label:first-child { margin-top:0; }
-  small { color:var(--muted); font-weight:400; }
-  input, textarea { width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:7px; background:var(--bg); color:var(--text); font:inherit; }
-  textarea { font-family:ui-monospace, monospace; font-size:13px; min-height:80px; }
-  .row { display:flex; gap:12px; flex-wrap:wrap; }
-  .row > div { flex:1; min-width:140px; }
-  button { padding:9px 16px; border-radius:7px; border:1px solid var(--accent); background:var(--accent); color:#fff; font:inherit; font-weight:600; cursor:pointer; }
-  button.ghost { background:transparent; color:var(--accent); }
-  button:disabled { opacity:.5; cursor:default; }
-  .actions { display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; }
-  ul { margin:8px 0 0; padding-left:20px; }
-  .req { color:var(--bad); }
-  .opts { color:var(--muted); font-size:13px; }
-  .err { color:var(--bad); }
-  .hint { color:var(--muted); font-size:13px; margin:8px 0 0; }
-  .bar { height:8px; background:var(--line); border-radius:4px; overflow:hidden; margin:8px 0; }
-  .bar > div { height:100%; width:0; background:var(--ok); transition:width .3s; }
-  pre { margin:0; max-height:240px; overflow:auto; font-size:13px; white-space:pre-wrap; }
-  .hidden { display:none; }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f2ee; --panel: #ffffff; --panel-2: #f7f5f1; --line: #e3dfd8;
+      --text: #16171c; --muted: #5f6270; --faint: #8b8e98;
+      --accent: #6d4fe0; --accent-ink: #ffffff; --accent-soft: rgb(109 79 224 / 0.1);
+      --ok: #16a34a; --ok-soft: rgb(22 163 74 / 0.1);
+      --bad: #dc2626; --bad-soft: rgb(220 38 38 / 0.08);
+      --warn: #b45309;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+    font: 15px/1.55 Inter, system-ui, sans-serif;
+    background-image: radial-gradient(60rem 30rem at 85% -10%, var(--accent-soft), transparent 70%);
+  }
+  main { max-width: 1120px; margin: 0 auto; padding: 32px 20px 64px; }
+
+  /* Header */
+  header { display: flex; align-items: center; gap: 14px; margin-bottom: 28px; }
+  .mark { width: 44px; height: 44px; border-radius: 12px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; flex: none; }
+  .mark svg { width: 22px; height: 22px; }
+  h1 { font: 700 26px/1.1 Syne, sans-serif; letter-spacing: -0.02em; margin: 0; }
+  .sub { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+  .pill { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .pill i { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
+  .pill.running i { background: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
+  .pill.done i { background: var(--ok); }
+  @keyframes pulse { 50% { opacity: 0.3; } }
+
+  /* Layout */
+  .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 20px; align-items: start; }
+  @media (max-width: 880px) { .grid { grid-template-columns: minmax(0, 1fr); } .pill { display: none; } }
+  .col { display: grid; gap: 20px; min-width: 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; min-width: 0; }
+  .card h2 { font: 700 17px/1.2 Syne, sans-serif; margin: 0 0 4px; display: flex; align-items: center; gap: 10px; }
+  .step { width: 24px; height: 24px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: inline-grid; place-items: center; font: 600 12px Inter, sans-serif; flex: none; }
+  .card .hint { color: var(--muted); font-size: 13.5px; margin: 0 0 16px; }
+
+  /* Inputs */
+  label { display: block; font-weight: 600; font-size: 13.5px; margin: 0 0 6px; }
+  label small { color: var(--faint); font-weight: 400; }
+  input, select, textarea {
+    width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--panel-2); color: var(--text); font: inherit; outline: none; transition: border-color .15s, box-shadow .15s;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  textarea { font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; min-height: 90px; resize: vertical; }
+  .linkrow { display: flex; gap: 10px; }
+  .linkrow .field { position: relative; flex: 1; min-width: 0; }
+  .linkrow .field svg { position: absolute; left: 12px; top: 50%; translate: 0 -50%; width: 16px; height: 16px; color: var(--faint); pointer-events: none; }
+  .linkrow input { padding-left: 36px; }
+  @media (max-width: 520px) { .linkrow { flex-direction: column; } }
+
+  button {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 11px 18px; border-radius: 10px; border: 1px solid transparent; font: 600 14.5px Inter, sans-serif; cursor: pointer; white-space: nowrap;
+    background: var(--accent); color: var(--accent-ink); transition: transform .1s, opacity .15s;
+  }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button.ghost { background: transparent; color: var(--text); border-color: var(--line); }
+  button.ghost:hover:not(:disabled) { border-color: var(--accent); }
+  button.danger { background: var(--bad-soft); color: var(--bad); border-color: transparent; }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button.big { width: 100%; padding: 14px 18px; font-size: 15.5px; }
+  .spin { width: 15px; height: 15px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .msg { margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--bad-soft); color: var(--bad); font-size: 13.5px; }
+  .note { margin: 0 0 14px; padding: 10px 12px; border-radius: 10px; font-size: 13.5px; background: var(--accent-soft); color: var(--text); }
+  .note.warn { background: var(--bad-soft); color: var(--bad); }
+
+  /* Form summary + questions */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+  .chip { padding: 4px 10px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+  .qs { display: grid; gap: 10px; }
+  .q { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 240px); gap: 10px 16px; align-items: center; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel-2); }
+  .q.missing { border-color: var(--bad); background: var(--bad-soft); }
+  .q .title { font-weight: 600; font-size: 14px; overflow-wrap: anywhere; }
+  .q .title .req { color: var(--bad); margin-left: 2px; }
+  .q .meta { color: var(--faint); font-size: 12.5px; margin-top: 2px; }
+  .q input, .q select { padding: 8px 10px; font-size: 13.5px; background: var(--panel); }
+  .q .auto { color: var(--faint); font-size: 13px; text-align: right; overflow-wrap: anywhere; }
+  @media (max-width: 600px) { .q { grid-template-columns: minmax(0, 1fr); } .q .auto { text-align: left; } }
+  details { margin-top: 16px; }
+  summary { cursor: pointer; color: var(--muted); font-size: 13.5px; }
+  details textarea { margin-top: 10px; }
+
+  /* Settings */
+  .settings { display: grid; gap: 18px; }
+  .stepper { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); overflow: hidden; }
+  .stepper button { background: transparent; color: var(--text); border-radius: 0; padding: 11px 16px; font-size: 18px; line-height: 1; }
+  .stepper input { border: 0; background: transparent; text-align: center; font-weight: 600; font-size: 16px; box-shadow: none; }
+  .presets { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .presets button { padding: 5px 10px; font-size: 12.5px; background: var(--panel-2); color: var(--muted); border-color: var(--line); }
+  .rangehead { display: flex; justify-content: space-between; align-items: baseline; }
+  .rangehead b { font-weight: 600; }
+  input[type=range] { padding: 0; border: 0; background: none; accent-color: var(--accent); box-shadow: none; }
+  .eta { font-size: 13px; color: var(--muted); margin: 6px 0 0; }
+
+  /* Progress */
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 4px 0 16px; }
+  .stat { padding: 12px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line); }
+  .stat b { display: block; font: 600 26px/1.15 Inter, sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .stat span { font-size: 12.5px; color: var(--muted); }
+  .stat.ok b { color: var(--ok); } .stat.bad b { color: var(--bad); }
+  .bar { height: 10px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); overflow: hidden; }
+  .bar div { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--ok)); border-radius: 999px; transition: width .35s ease; }
+  .progtext { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin: 8px 0 14px; }
+  .log { list-style: none; margin: 0; padding: 0; max-height: 300px; overflow: auto; display: grid; gap: 4px; font-size: 13px; }
+  .log li { display: flex; gap: 10px; align-items: baseline; padding: 6px 10px; border-radius: 8px; background: var(--panel-2); }
+  .log li::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--faint); flex: none; translate: 0 -1px; }
+  .log li.ok::before { background: var(--ok); }
+  .log li.bad::before { background: var(--bad); }
+  .log li.bad { color: var(--bad); }
+  .log .n { color: var(--faint); font-variant-numeric: tabular-nums; flex: none; }
+  .empty { color: var(--faint); font-size: 13.5px; text-align: center; padding: 22px 8px; border: 1px dashed var(--line); border-radius: 12px; }
+  .hidden { display: none !important; }
+  footer { color: var(--faint); font-size: 12.5px; margin-top: 28px; text-align: center; }
 </style>
 </head>
 <body>
 <main>
-  <h1>Form Filler</h1>
-  <p class="sub">Paste a Google Form link, pick how many responses to send, and start.</p>
-
-  <div class="card">
-    <label for="link">Form link <small>(the share link ending in /viewform, or forms.gle)</small></label>
-    <input id="link" placeholder="https://docs.google.com/forms/d/e/.../viewform">
-    <div class="row">
-      <div><label for="count">How many times</label><input id="count" type="number" min="1" value="5"></div>
-      <div><label for="delay">Wait after each (seconds)</label><input id="delay" type="number" min="0" step="0.5" value="2"></div>
-      <div><label for="email">Email <small>(optional)</small></label><input id="email" placeholder="if the form asks"></div>
+  <header>
+    <div class="mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>
     </div>
-    <p class="hint">It sends one response, waits this many seconds, then sends the next. 300 responses at 2 seconds takes about 10 minutes. Sending too fast can get you blocked by Google.</p>
-    <label for="answers">Fixed answers <small>(optional JSON, by question title; a list picks one at random)</small></label>
-    <textarea id="answers" placeholder='{"Name": "Test User", "Age group": ["18-24", "25-34"]}'></textarea>
-    <div class="actions">
-      <button class="ghost" id="loadBtn">Check form</button>
-      <button id="startBtn">Start</button>
-      <button class="ghost hidden" id="stopBtn">Stop</button>
+    <div>
+      <h1>Form Filler</h1>
+      <p class="sub">Send sample responses to your own Google Forms, as many as you need.</p>
     </div>
-    <p id="msg" class="err"></p>
-  </div>
+    <span class="pill" id="pill"><i></i><span id="pillText">Ready</span></span>
+  </header>
 
-  <div class="card hidden" id="formCard">
-    <strong id="formTitle"></strong>
-    <p id="formNotes" class="hint"></p>
-    <ul id="qList"></ul>
-  </div>
+  <div class="grid">
+    <div class="col">
+      <section class="card">
+        <h2><span class="step">1</span> Your form</h2>
+        <p class="hint">Paste the share link (ending in /viewform, or a forms.gle link), then check it.</p>
+        <div class="linkrow">
+          <div class="field">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5"/></svg>
+            <input id="link" placeholder="https://docs.google.com/forms/d/e/…/viewform" autocomplete="off" spellcheck="false">
+          </div>
+          <button class="ghost" id="loadBtn">Check form</button>
+        </div>
+        <p id="loadMsg" class="msg hidden"></p>
+      </section>
 
-  <div class="card hidden" id="progCard">
-    <strong id="progText"></strong>
-    <div class="bar"><div id="progBar"></div></div>
-    <pre id="logBox"></pre>
+      <section class="card hidden" id="formCard">
+        <h2><span class="step">2</span> Answers</h2>
+        <p class="hint">Everything is filled in automatically. To control an answer, add it below as JSON, by question title. A list picks one at random each time.</p>
+        <div class="chips" id="chips"></div>
+        <p class="note warn hidden" id="missingNote"></p>
+        <div class="qs" id="qList"></div>
+        <label for="answers" style="margin-top:16px">Fixed answers <small>(optional JSON)</small></label>
+        <textarea id="answers" placeholder='{"Name": "Test User", "Age group": ["18-24", "25-34"]}'></textarea>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="card">
+        <h2><span class="step" id="runStep">2</span> Run</h2>
+        <p class="hint">One response at a time, with a pause in between.</p>
+        <div class="settings">
+          <div>
+            <label for="count">How many responses</label>
+            <div class="stepper">
+              <button type="button" id="minus" aria-label="Fewer">−</button>
+              <input id="count" type="number" min="1" value="5" inputmode="numeric">
+              <button type="button" id="plus" aria-label="More">+</button>
+            </div>
+            <div class="presets">
+              <button type="button" data-n="10">10</button>
+              <button type="button" data-n="50">50</button>
+              <button type="button" data-n="100">100</button>
+              <button type="button" data-n="300">300</button>
+            </div>
+          </div>
+          <div>
+            <div class="rangehead"><label for="delay">Pause between responses</label><b id="delayVal">2 s</b></div>
+            <input id="delay" type="range" min="0" max="10" step="0.5" value="2">
+            <p class="eta" id="eta"></p>
+          </div>
+          <div id="emailWrap">
+            <label for="email">Email <small>(only if the form collects emails)</small></label>
+            <input id="email" type="email" placeholder="A test address is used if left empty">
+          </div>
+          <div>
+            <button class="big" id="startBtn">Start sending</button>
+            <button class="big danger hidden" id="stopBtn">Stop</button>
+            <p id="startMsg" class="msg hidden"></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Progress</h2>
+        <div class="stats">
+          <div class="stat ok"><b id="sOk">0</b><span>Submitted</span></div>
+          <div class="stat bad"><b id="sBad">0</b><span>Failed</span></div>
+          <div class="stat"><b id="sLeft">0</b><span>Remaining</span></div>
+        </div>
+        <div class="bar"><div id="progBar"></div></div>
+        <div class="progtext"><span id="progText">Not started</span><span id="progPct"></span></div>
+        <ul class="log" id="log"></ul>
+        <p class="empty" id="logEmpty">Each response will show up here as it’s sent.</p>
+      </section>
+    </div>
   </div>
+  <footer>Forms that need a Google sign-in (verified emails, file uploads, one response per person) can’t be filled.</footer>
 </main>
+
 <script>
-const $ = id => document.getElementById(id);
+const $ = (id) => document.getElementById(id);
+const TYPE_NAMES = { 0: "Short answer", 1: "Paragraph", 2: "Multiple choice", 3: "Dropdown", 4: "Checkboxes", 5: "Linear scale", 7: "Grid row", 9: "Date", 10: "Time" };
+let form = null;
 let timer = null;
 
 async function api(path, body) {
-  const res = await fetch(path, body ? {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)} : undefined);
+  const res = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : undefined);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "Something went wrong.");
   return data;
 }
 
-function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+function show(el, text) { el.textContent = text; el.classList.toggle("hidden", !text); }
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+
+function duration(seconds) {
+  if (seconds < 60) return `${Math.round(seconds)} seconds`;
+  const m = Math.round(seconds / 60);
+  if (m < 60) return `${m} minute${m === 1 ? "" : "s"}`;
+  const h = Math.floor(m / 60), rest = m % 60;
+  return `${h} h ${rest} min`;
+}
+function updateEta() {
+  const n = Math.max(1, parseInt($("count").value) || 1), d = parseFloat($("delay").value);
+  $("delayVal").textContent = `${d} s`;
+  // Each response also takes about a second to send
+  $("eta").textContent = `${n} response${n === 1 ? "" : "s"} will take about ${duration(n * (d + 1))}.${d < 1 ? " Going this fast can get you blocked by Google." : ""}`;
+}
+["count", "delay"].forEach((id) => $(id).addEventListener("input", updateEta));
+$("minus").onclick = () => { $("count").value = Math.max(1, (parseInt($("count").value) || 1) - 1); updateEta(); };
+$("plus").onclick = () => { $("count").value = (parseInt($("count").value) || 0) + 1; updateEta(); };
+document.querySelectorAll(".presets button").forEach((b) => (b.onclick = () => { $("count").value = b.dataset.n; updateEta(); }));
+updateEta();
+
+$("link").addEventListener("keydown", (e) => { if (e.key === "Enter") $("loadBtn").click(); });
 
 $("loadBtn").onclick = async () => {
-  $("msg").textContent = "";
-  $("loadBtn").disabled = true;
+  show($("loadMsg"), "");
+  const btn = $("loadBtn");
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Checking';
   try {
-    const data = await api("/api/load", {link: $("link").value});
-    $("formTitle").textContent = `Found ${data.questions.length} question(s) on ${data.pages} page(s)`;
-    const notes = [];
-    if (data.collects_email) notes.push("This form collects emails. Your email box is used, or a test address if it's empty.");
-    if (data.missing.length) notes.push("Set these under Fixed answers before starting (they have a custom format rule): " + data.missing.join(", "));
-    $("formNotes").textContent = notes.join(" ");
-    $("formNotes").className = data.missing.length ? "err" : "hint";
-    $("qList").innerHTML = data.questions.map(q =>
-      `<li>${q.required ? '<span class="req">*</span> ' : ''}${esc(q.title || "(untitled)")}` +
-      (q.options.length ? `<div class="opts">${esc(q.options.join(" · "))}</div>` : "") + `</li>`).join("");
-    $("formCard").classList.remove("hidden");
-  } catch (e) { $("msg").textContent = e.message; }
-  $("loadBtn").disabled = false;
+    form = await api("/api/load", { link: $("link").value });
+    renderForm();
+  } catch (e) {
+    show($("loadMsg"), e.message);
+    $("formCard").classList.add("hidden");
+    form = null;
+  }
+  btn.disabled = false; btn.textContent = "Check form";
 };
+
+function renderForm() {
+  const chips = $("chips"); chips.replaceChildren();
+  const required = form.questions.filter((q) => q.required).length;
+  chips.append(el("span", "chip", `${form.questions.length} question${form.questions.length === 1 ? "" : "s"}`));
+  chips.append(el("span", "chip", `${form.pages} page${form.pages === 1 ? "" : "s"}`));
+  chips.append(el("span", "chip", `${required} required`));
+  if (form.collects_email) chips.append(el("span", "chip", "Collects emails"));
+  $("emailWrap").classList.toggle("hidden", !form.collects_email);
+
+  const missing = new Set(form.missing);
+  show($("missingNote"), missing.size ? `Add ${missing.size === 1 ? "this question" : "these questions"} to Fixed answers first. ${missing.size === 1 ? "It has" : "They have"} a custom format rule that can’t be guessed.` : "");
+
+  const list = $("qList"); list.replaceChildren();
+  form.questions.forEach((q, i) => {
+    const row = el("div", "q" + (missing.has(q.title) ? " missing" : ""));
+    const left = el("div");
+    const title = el("div", "title", q.title || "(untitled)");
+    if (q.required) title.append(el("span", "req", "*"));
+    left.append(title, el("div", "meta", TYPE_NAMES[q.type] || "Choice"));
+    row.append(left);
+
+    if (q.options.length) row.append(el("div", "auto", q.options.join(" · ")));
+    list.append(row);
+  });
+  $("formCard").classList.remove("hidden");
+  $("runStep").textContent = "3";
+}
+
+function overrides() {
+  let result = {};
+  const raw = $("answers").value.trim();
+  if (raw) {
+    try { result = JSON.parse(raw); } catch (e) { throw new Error("The advanced JSON answers aren’t valid: " + e.message); }
+    if (typeof result !== "object" || Array.isArray(result) || result === null) throw new Error('Advanced answers must look like {"Question title": "answer"}.');
+  }
+  return result;
+}
 
 $("startBtn").onclick = async () => {
-  $("msg").textContent = "";
+  show($("startMsg"), "");
   try {
-    await api("/api/start", {link: $("link").value, count: $("count").value, delay: $("delay").value,
-                             email: $("email").value, answers: $("answers").value});
-    $("progCard").classList.remove("hidden");
+    const answers = overrides();
+    if (form) {
+      const stillMissing = form.missing.filter((t) => !(t in answers));
+      if (stillMissing.length) throw new Error("Set a fixed answer for: " + stillMissing.join(", "));
+    }
+    await api("/api/start", { link: $("link").value, count: $("count").value, delay: $("delay").value, email: $("email").value, answers: JSON.stringify(answers) });
     poll();
-  } catch (e) { $("msg").textContent = e.message; }
+  } catch (e) { show($("startMsg"), e.message); }
 };
+$("stopBtn").onclick = () => { $("stopBtn").disabled = true; $("stopBtn").textContent = "Stopping…"; api("/api/stop", {}); };
 
-$("stopBtn").onclick = () => api("/api/stop", {});
+function renderLog(lines) {
+  const log = $("log");
+  const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+  log.replaceChildren();
+  lines.forEach((line) => {
+    const m = line.match(/^\[(\d+)\/(\d+)\]\s*(.*)$/);
+    const text = m ? m[3] : line;
+    const ok = /^Submitted/.test(text);
+    const li = el("li", ok ? "ok" : /Rejected|Error|error|need|Couldn|stopped/.test(text) ? "bad" : "");
+    if (m) li.append(el("span", "n", `#${m[1]}`));
+    li.append(el("span", "", text));
+    log.append(li);
+  });
+  $("logEmpty").classList.toggle("hidden", lines.length > 0);
+  if (atBottom) log.scrollTop = log.scrollHeight;
+}
 
 async function poll() {
   clearTimeout(timer);
   let s;
   try { s = await api("/api/status"); }
-  catch (e) { $("progText").textContent = "Lost connection to the app. Is the terminal still running?"; timer = setTimeout(poll, 3000); return; }
-  $("progText").textContent = s.running ? `Sending… ${s.done}/${s.total}` : `Finished: ${s.ok}/${s.total} submitted`;
-  $("progBar").style.width = s.total ? (100 * s.done / s.total) + "%" : "0";
-  $("logBox").textContent = s.log.join("\n");
-  $("logBox").scrollTop = $("logBox").scrollHeight;
-  $("startBtn").disabled = s.running;
+  catch { $("progText").textContent = "Lost connection to the app. Is the terminal still running?"; timer = setTimeout(poll, 3000); return; }
+  const failed = s.done - s.ok;
+  $("sOk").textContent = s.ok;
+  $("sBad").textContent = failed;
+  $("sLeft").textContent = Math.max(0, s.total - s.done);
+  const pct = s.total ? Math.round((100 * s.done) / s.total) : 0;
+  $("progBar").style.width = pct + "%";
+  $("progPct").textContent = s.total ? pct + "%" : "";
+  $("progText").textContent = s.running ? `Sending ${s.done} of ${s.total}…` : s.total ? `Finished: ${s.ok} of ${s.total} submitted` : "Not started";
+  renderLog(s.log);
+
+  $("startBtn").classList.toggle("hidden", s.running);
   $("stopBtn").classList.toggle("hidden", !s.running);
+  if (!s.running) { $("stopBtn").disabled = false; $("stopBtn").textContent = "Stop"; }
+  $("pill").className = "pill" + (s.running ? " running" : s.total ? " done" : "");
+  $("pillText").textContent = s.running ? "Sending" : s.total ? "Finished" : "Ready";
   if (s.running) timer = setTimeout(poll, 700);
 }
+poll();
 </script>
 </body>
 </html>
