@@ -100,7 +100,7 @@
   .q .title .req { color: var(--bad); margin-left: 2px; }
   .q .meta { color: var(--faint); font-size: 12.5px; margin-top: 2px; }
   .q input, .q select { padding: 8px 10px; font-size: 13.5px; background: var(--panel); }
-  .q .auto { color: var(--faint); font-size: 13px; text-align: right; overflow-wrap: anywhere; }
+  .q .auto { color: var(--faint); font-size: 13px; text-align: right; }
   @media (max-width: 600px) { .q { grid-template-columns: minmax(0, 1fr); } .q .auto { text-align: left; } }
   details { margin-top: 16px; }
   summary { cursor: pointer; color: var(--muted); font-size: 13.5px; }
@@ -169,12 +169,14 @@
 
       <section class="card hidden" id="formCard">
         <h2><span class="step">2</span> Answers</h2>
-        <p class="hint">Everything is filled in automatically. To control an answer, add it below as JSON, by question title. A list picks one at random each time.</p>
+        <p class="hint">Everything is filled in automatically. Set a fixed answer for any question you want to control. For text, separate several answers with | to rotate between them.</p>
         <div class="chips" id="chips"></div>
         <p class="note warn hidden" id="missingNote"></p>
         <div class="qs" id="qList"></div>
-        <label for="answers" style="margin-top:16px">Fixed answers <small>(optional JSON)</small></label>
-        <textarea id="answers" placeholder='{"Name": "Test User", "Age group": ["18-24", "25-34"]}'></textarea>
+        <details>
+          <summary>Advanced: paste fixed answers as JSON</summary>
+          <textarea id="answers" placeholder='{"Name": "Test User", "Age group": ["18-24", "25-34"]}'></textarea>
+        </details>
       </section>
     </div>
 
@@ -234,6 +236,7 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const TYPE_NAMES = { 0: "Short answer", 1: "Paragraph", 2: "Multiple choice", 3: "Dropdown", 4: "Checkboxes", 5: "Linear scale", 7: "Grid row", 9: "Date", 10: "Time" };
+const TEXT = [0, 1], DATE = 9, TIME = 10;
 let form = null;
 let timer = null;
 
@@ -293,7 +296,7 @@ function renderForm() {
   $("emailWrap").classList.toggle("hidden", !form.collects_email);
 
   const missing = new Set(form.missing);
-  show($("missingNote"), missing.size ? `Add ${missing.size === 1 ? "this question" : "these questions"} to Fixed answers first. ${missing.size === 1 ? "It has" : "They have"} a custom format rule that can’t be guessed.` : "");
+  show($("missingNote"), missing.size ? `Give ${missing.size === 1 ? "this question" : "these questions"} a fixed answer first. ${missing.size === 1 ? "It has" : "They have"} a custom format rule that can’t be guessed.` : "");
 
   const list = $("qList"); list.replaceChildren();
   form.questions.forEach((q, i) => {
@@ -304,7 +307,19 @@ function renderForm() {
     left.append(title, el("div", "meta", TYPE_NAMES[q.type] || "Choice"));
     row.append(left);
 
-    if (q.options.length) row.append(el("div", "auto", q.options.join(" · ")));
+    let control;
+    if (q.type === DATE || q.type === TIME) {
+      control = el("div", "auto", q.type === DATE ? "Today’s date" : "Current time");
+    } else if (q.options.length) {
+      control = el("select");
+      control.append(new Option("Random", ""));
+      q.options.forEach((o) => control.append(new Option(o, o)));
+    } else {
+      control = el("input");
+      control.placeholder = missing.has(q.title) ? "Needs a fixed answer" : "Random sample text";
+    }
+    control.dataset.q = i;
+    row.append(control);
     list.append(row);
   });
   $("formCard").classList.remove("hidden");
@@ -317,6 +332,15 @@ function overrides() {
   if (raw) {
     try { result = JSON.parse(raw); } catch (e) { throw new Error("The advanced JSON answers aren’t valid: " + e.message); }
     if (typeof result !== "object" || Array.isArray(result) || result === null) throw new Error('Advanced answers must look like {"Question title": "answer"}.');
+  }
+  if (form) {
+    document.querySelectorAll("[data-q]").forEach((c) => {
+      const q = form.questions[c.dataset.q];
+      const value = (c.value || "").trim();
+      if (!value || c.tagName === "DIV") return;
+      const parts = TEXT.includes(q.type) ? value.split("|").map((s) => s.trim()).filter(Boolean) : [value];
+      result[q.title] = parts.length > 1 ? parts : parts[0];
+    });
   }
   return result;
 }
