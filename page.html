@@ -240,6 +240,15 @@ const TEXT = [0, 1], DATE = 9, TIME = 10;
 let form = null;
 let timer = null;
 
+// Remember the last link and settings on this computer
+const saved = (() => { try { return JSON.parse(localStorage.getItem("formfiller") || "{}"); } catch { return {}; } })();
+if (saved.link) $("link").value = saved.link;
+if (saved.count) $("count").value = saved.count;
+if (saved.delay !== undefined) $("delay").value = saved.delay;
+function remember() {
+  try { localStorage.setItem("formfiller", JSON.stringify({ link: $("link").value, count: $("count").value, delay: $("delay").value })); } catch {}
+}
+
 async function api(path, body) {
   const res = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : undefined);
   const data = await res.json();
@@ -263,10 +272,10 @@ function updateEta() {
   // Each response also takes about a second to send
   $("eta").textContent = `${n} response${n === 1 ? "" : "s"} will take about ${duration(n * (d + 1))}.${d < 1 ? " Going this fast can get you blocked by Google." : ""}`;
 }
-["count", "delay"].forEach((id) => $(id).addEventListener("input", updateEta));
-$("minus").onclick = () => { $("count").value = Math.max(1, (parseInt($("count").value) || 1) - 1); updateEta(); };
-$("plus").onclick = () => { $("count").value = (parseInt($("count").value) || 0) + 1; updateEta(); };
-document.querySelectorAll(".presets button").forEach((b) => (b.onclick = () => { $("count").value = b.dataset.n; updateEta(); }));
+["count", "delay"].forEach((id) => $(id).addEventListener("input", () => { updateEta(); remember(); }));
+$("minus").onclick = () => { $("count").value = Math.max(1, (parseInt($("count").value) || 1) - 1); updateEta(); remember(); };
+$("plus").onclick = () => { $("count").value = (parseInt($("count").value) || 0) + 1; updateEta(); remember(); };
+document.querySelectorAll(".presets button").forEach((b) => (b.onclick = () => { $("count").value = b.dataset.n; updateEta(); remember(); }));
 updateEta();
 
 $("link").addEventListener("keydown", (e) => { if (e.key === "Enter") $("loadBtn").click(); });
@@ -277,6 +286,7 @@ $("loadBtn").onclick = async () => {
   btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Checking';
   try {
     form = await api("/api/load", { link: $("link").value });
+    remember();
     renderForm();
   } catch (e) {
     show($("loadMsg"), e.message);
@@ -368,6 +378,7 @@ $("startBtn").onclick = async () => {
       const stillMissing = form.missing.filter((t) => !(t in answers));
       if (stillMissing.length) throw new Error("Set a fixed answer for: " + stillMissing.join(", "));
     }
+    remember();
     await api("/api/start", { link: $("link").value, count: $("count").value, delay: $("delay").value, email: $("email").value, answers: JSON.stringify(answers) });
     poll();
   } catch (e) { show($("startMsg"), e.message); }
