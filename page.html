@@ -319,11 +319,26 @@ function renderForm() {
       control.placeholder = missing.has(q.title) ? "Needs a fixed answer" : "Random sample text";
     }
     control.dataset.q = i;
+    if (missing.has(q.title)) control.addEventListener("input", updateMissing);
     row.append(control);
     list.append(row);
   });
   $("formCard").classList.remove("hidden");
   $("runStep").textContent = "3";
+}
+
+// Clears the warning on custom-format questions as soon as they get an answer
+function updateMissing() {
+  const left = [];
+  document.querySelectorAll("[data-q]").forEach((c) => {
+    const q = form.questions[c.dataset.q];
+    if (!form.missing.includes(q.title)) return;
+    const empty = !(c.value || "").trim();
+    c.closest(".q").classList.toggle("missing", empty);
+    if (empty) left.push(q.title);
+  });
+  if (!left.length) show($("startMsg"), "");
+  show($("missingNote"), left.length ? `Give ${left.length === 1 ? "this question" : "these questions"} a fixed answer first. ${left.length === 1 ? "It has" : "They have"} a custom format rule that can’t be guessed.` : "");
 }
 
 function overrides() {
